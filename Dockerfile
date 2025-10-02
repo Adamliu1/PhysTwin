@@ -28,23 +28,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV QT_DEBUG_PLUGINS=1
 ENV QT_QPA_PLATFORM=xcb
 
-# Install miniconda
+# Install miniforge (includes mamba)
 ENV CONDA_DIR="/opt/conda"
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
-    /bin/bash ~/miniconda.sh -b -p /opt/conda
+RUN wget --quiet https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O ~/miniforge3.sh && \
+    /bin/bash ~/miniforge3.sh -b -p /opt/conda && \
+    rm -rf ~/miniforge3.sh
 
-# Put conda in path so we can use conda activate
+# Put conda in path so we can use conda/mamba activate
 ENV PATH=$CONDA_DIR/bin:$PATH
-RUN conda init bash 
+RUN conda init bash && \
+    mamba shell init -s bash
 
-# Create a new conda environment
-RUN /opt/conda/bin/conda create -y -n phystwin_env python=3.10
+# Create a new conda environment using mamba (faster than conda)
+RUN /opt/conda/bin/mamba create -y -n phystwin_env python=3.10
 
 # Set the working directory, non-root user, and permissions
 WORKDIR /PhysTwin
 
 # Copy contents of the repository to the container
-COPY --chmod=755 . .
+COPY . .
+
+# Set executable permissions for scripts
+RUN chmod +x env_install/env_install.sh
 
 # CUDA architecture settings
 # This is set to 8.6 for NVIDIA RTX 30 series GPUs (Ampere architecture)
@@ -52,8 +57,11 @@ COPY --chmod=755 . .
 # You can find the list of CUDA architectures here: https://developer.nvidia.com/cuda-gpus
 ARG TORCH_CUDA_ARCH_LIST="8.6+PTX"
 
-# Activate the conda environment and install dependencies
-RUN /bin/bash -c "source activate phystwin_env && chmod +x env_install/env_install.sh && ./env_install/env_install.sh"
+# Activate the conda environment and install dependencies using mamba
+RUN /bin/bash -c "source activate phystwin_env && ./env_install/env_install.sh"
+
+# Set up conda environment activation for interactive shells
+RUN echo "source activate phystwin_env" >> ~/.bashrc
 
 # Set the default command
 CMD ["/bin/bash"]
