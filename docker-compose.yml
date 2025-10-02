@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  phystwin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TORCH_CUDA_ARCH_LIST: "8.9+PTX"  # Adjust for your GPU architecture
+    image: phystwin:latest
+    container_name: phystwin_dev
+    
+    ulimits:
+      nofile:
+        soft: 524288
+        hard: 524288
+
+    network_mode: host
+    privileged: true
+    stdin_open: true
+    tty: true
+    working_dir: /PhysTwin
+
+    runtime: nvidia
+
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - NVIDIA_VISIBLE_DEVICES=all              # Make all NVIDIA GPUs visible
+      - NVIDIA_DRIVER_CAPABILITIES=all          # Enable compute + graphics
+      - __NV_PRIME_RENDER_OFFLOAD=1             # For hybrid iGPU/dGPU (opt)
+      - __GLX_VENDOR_LIBRARY_NAME=nvidia        # For OpenGL to use NVIDIA
+      - VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
+      - VK_LAYER_PATH=/etc/vulkan/explicit_layer.d
+
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev/input:/dev/input
+      - /dev/bus/usb:/dev/bus/usb:rw
+      - /home/${USER}:/home/${USER}:rw
+      - .:/PhysTwin:rw                           # Mount project directory
+      - /usr/share/vulkan/icd.d:/etc/vulkan/icd.d:ro
+      - /usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d:ro
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
